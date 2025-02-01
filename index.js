@@ -1,27 +1,37 @@
 // LinuxServer KasmVNC Client
+// --------------------------
+// modified by gbraad / spotsnel
 
-//// Env variables ////
-var CUSTOM_USER = process.env.CUSTOM_USER || 'abc';
-var PASSWORD = process.env.PASSWORD || 'abc';
-var SUBFOLDER = process.env.SUBFOLDER || '/';
-var TITLE = process.env.TITLE || 'KasmVNC Client';
-var FM_HOME = process.env.FM_HOME || '/config';
+const ini = require('ini');
+var fs = require('fs');
+
+// Read and parse the ini file
+const configFile = fs.readFileSync('/etc/rdesktop/rdesktop.ini', 'utf-8');
+const config = ini.parse(configFile);
+
+// Read from configuration
+var SUBFOLDER = config.rdesktop.subfolder || '/';
+var TITLE = config.rdesktop.title || 'KasmVNC Client';
+var FM_HOME = config.rdesktop.fmhome || process.env.HOME;
 var PATH;
 if (SUBFOLDER != '/') {
   PATH = '&path=' + SUBFOLDER.substring(1) + 'websockify'
 } else {
   PATH = false;
 }
+
 //// Application Variables ////
 var socketIO = require('socket.io');
 var express = require('express');
-var ejs = require('ejs');
 var app = require('express')();
-var http = require('http').Server(app);
-var bodyParser = require('body-parser');
+
+var privateKey = fs.readFileSync( '/etc/rdesktop/privatekey.key' );
+var certificate = fs.readFileSync( '/etc/rdesktop/certificate.pem' );
+var https = require('https').Server({key: privateKey, cert: certificate }, app);
+
 var baseRouter = express.Router();
 var fsw = require('fs').promises;
-var fs = require('fs');
+
 // Audio init
 var audioEnabled = true;
 var PulseAudio = require('pulseaudio2');
@@ -37,7 +47,6 @@ pulse.on('error', function(error) {
 app.engine('html', require('ejs').renderFile);
 app.engine('json', require('ejs').renderFile);
 baseRouter.use('/public', express.static(__dirname + '/public'));
-baseRouter.use('/vnc', express.static("/usr/share/kasmvnc/www/"));
 baseRouter.get('/', function (req, res) {
   res.render(__dirname + '/public/index.html', {title: TITLE, path: PATH});
 });
@@ -54,7 +63,7 @@ baseRouter.get('/files', function (req, res) {
   res.sendFile( __dirname + '/public/filebrowser.html');
 });
 // Websocket comms //
-io = socketIO(http, {path: SUBFOLDER + 'files/socket.io',maxHttpBufferSize: 200000000});
+io = socketIO(https, {path: SUBFOLDER + 'files/socket.io',maxHttpBufferSize: 200000000});
 io.on('connection', async function (socket) {
   let id = socket.id;
 
@@ -149,7 +158,7 @@ io.on('connection', async function (socket) {
 });
 
 //// PCM Audio Wrapper ////
-aio = socketIO(http, {path: SUBFOLDER + 'audio/socket.io'});
+aio = socketIO(https, {path: SUBFOLDER + 'audio/socket.io'});
 aio.on('connection', function (socket) {
   var record;
   let id = socket.id;
@@ -194,4 +203,5 @@ aio.on('connection', function (socket) {
 
 // Spin up application on 6900
 app.use(SUBFOLDER, baseRouter);
-http.listen(6900);
+
+https.listen(8444);

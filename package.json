@@ -1,11 +1,12 @@
 {
-  "name": "kclient",
+  "name": "modified-kclient",
   "version": "0.4.1",
   "description": "Kclient is a wrapper for KasmVNC to add functionality to a containerized environment",
   "main": "index.js",
   "dependencies": {
     "ejs": "^3.1.8",
     "express": "^4.18.2",
+    "ini": "^5.0.0",
     "pulseaudio2": "^0.5.5",
     "socket.io": "^4.6.0"
   },
@@ -15,7 +16,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/linuxserver/kclient.git"
+    "url": "git+https://github.com/gbraad-devenv/kclient.git"
   },
   "keywords": [
     "VNC",
