@@ -19,6 +19,11 @@ jobs:
       options: --privileged
 
     steps:
+      - name: Install build dependencies
+        run: |
+          dnf install -y \
+            nodejs nodejs-npm
+
       - name: Check out repository code
         uses: actions/checkout@v4
 
