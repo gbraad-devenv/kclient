@@ -9,31 +9,67 @@ on:
   pull_request: {}
 
 jobs:
-
-  build-extension:
+  test-playbook-devenv:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    container: 
-      image: ghcr.io/gbraad-actions/fedora:stable
-      options: --privileged
 
     steps:
-      - name: Install build dependencies
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # This folder will be used with the container
+      - name: Create userdirs
         run: |
-          dnf install -y \
-            nodejs nodejs-npm
+          cd ${{ github.workspace }}
+          mkdir -p Projects
+          ln -s ${{ github.workspace }}/Projects  ${HOME}/Projects
+          mkdir -p Uploads
+          ln -s ${{ github.workspace }}/Uploads  ${HOME}/Uploads
 
-      - name: Check out repository code
-        uses: actions/checkout@v4
+      # Install dotfiles from upstream
+      - name: Setup dotfiles environment
+        uses: gbraad-dotfiles/install-action@main
+        with:
+          upstream: true
 
-      - name: Install project dependencies
+      - name: Run devenv command - start container
+        id: devenv
+        uses: gbraad-dotfiles/devenv-action@main
+        with:
+          prefix: devfedora
+          command: start
+
+      - name: Run devenv command - install dependencies
+        uses: gbraad-dotfiles/devenv-action@main
+        with:
+          prefix: devfedora
+          command: |
+            sudo dnf install -y @development-tools gcc-c++ nodejs nodejs-devel pulseaudio-libs-devel
+
+      - name: Run devenv command - npm install
+        uses: gbraad-dotfiles/devenv-action@main
+        with:
+          prefix: devfedora
+          command: |
+            sudo bash -c "cd /opt \
+              && git clone https://github.com/gbraad-devenv/kclient \
+              && cd kclient \
+              && npm install ."
+
+      - name: Copy artifacts to the uploads folder
         run: |
-          npm install
+          podman cp devfedorasys:/opt/kclient ${HOME}/Uploads/
 
-      - name: Upload kclient
+      - name: Remove build environment
+        uses: gbraad-dotfiles/devenv-action@main
+        with:
+          prefix: devfedora
+          command: rm
+
+      - name: Upload Artifact - uploads
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: kclient
-          path: .
+          path: ${{ github.workspace }}/Uploads/
           retention-days: 7
+          include-hidden-files: true
